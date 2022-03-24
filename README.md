@@ -6,13 +6,13 @@ This bot uses JSON database which I scraped by myself. Maybe later I'll add feat
 ## User data database
 Here I use default sqlite3 module, beacuse the database isn't such complicated to use something else.
 ## Commands
-/start - start bot, create new user in the database.
-/info - useless information for those who cares.
-/roll - get random anime.
-/filter - setup filters (anime rating, type and genre).
-/cancel - stop setting up filters. 
-/reset - reset filters.
-/stat - get number of times you've used /roll command.
+- /start - start bot, create new user in the database.
+- /info - useless information for those who cares.
+- /roll - get random anime.
+- /filter - setup filters (anime rating, type and genre).
+- /cancel - stop setting up filters. 
+- /reset - reset filters.
+- /stat - get number of times you've used /roll command.
 ## How to setup the bot:
 1. Get your bot token from @BotFather
 2. Insert token in config.py
