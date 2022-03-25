@@ -52,7 +52,7 @@ def filter_genre(animes: list, genre: str):
 
 
 def create_message(anime: dict):
-    length = sum([len(x + y) for x, y in anime.items()]) - len(anime['link']) - len(anime['image'])
+    length = sum([len(x + y) for x, y in list(anime.items())[:-1]]) - len(anime['link']) - len(anime['image'])
     if length > 1024:
         desc = anime['Описание']
         desc = desc[:1024 - length - len("читать дальше...")]
@@ -70,7 +70,7 @@ def create_message(anime: dict):
     return message
 
 
-def get_anime(user_id):
+def get_random_anime(user_id):
     with open('sorted.json', 'r', encoding='utf-8') as file:
         t = file.read()
         animes = json.loads(t)
@@ -81,9 +81,17 @@ def get_anime(user_id):
     return anime
 
 
+def get_anime(anime_id):
+    with open('sorted.json', 'r', encoding='utf-8') as file:
+        t = file.read()
+        animes = json.loads(t)
+        anime = animes[anime_id]
+    return anime
+
+
 def roll(update: Update, context: CallbackContext):
     try:
-        anime = get_anime(update.effective_user.id)
+        anime = get_random_anime(update.effective_user.id)
         message = create_message(anime)
         reply_markup = InlineKeyboardMarkup(
             [
@@ -97,12 +105,37 @@ def roll(update: Update, context: CallbackContext):
             parse_mode='MARKDOWN',
             reply_markup=reply_markup
         )
+        db.set_parametr('last_anime', anime['id'], update.effective_user.id)
     except IndexError:
         update.message.reply_text(text="Такого аниме не нашлось...")
     except:
         update.message.reply_text(text="Чёто случилось, я сам не пойму чё. Ещё раз попробуй, только нормально.")
     else:
         db.update_rolls(update.effective_user.id)
+
+
+def add_to_fav(update: Update, context: CallbackContext):
+    user_id = update.effective_user.id
+    anime_id = str(db.get_parametr('last_anime', user_id)) + ' '
+    if anime_id in db.get_parametr('favs', user_id):
+        update.message.reply_text("Аниме уже есть в избранном!")
+        return
+    db.update_favourites(anime_id, user_id)
+    update.message.reply_text("Аниме добавлено в избранное!")
+
+
+def get_favs(update: Update, context: CallbackContext):
+    user_id = update.effective_user.id
+    anime_id = int(db.get_parametr('favs', user_id)[:-1].split()[0])
+    anime = get_anime(anime_id)
+    message = create_message(anime)
+    context.bot.send_photo(
+        chat_id=update.effective_chat.id,
+        photo=anime["image"],
+        caption=message,
+        parse_mode='MARKDOWN',
+        reply_markup=kb.FIRST_FAV
+    )
 
 
 # /filter command
@@ -171,6 +204,7 @@ def main():
     start_handler = CommandHandler('start', start)
     info_handler = CommandHandler('info', info)
     roll_handler = CommandHandler('roll', roll)
+    fav_handler = CommandHandler('favs', get_favs)
     statistic_handler = CommandHandler('stat', statistic)
     default_handler = CommandHandler('reset', reset)
     sorting_handler = ConversationHandler(
@@ -182,9 +216,12 @@ def main():
         },
         fallbacks=[CommandHandler('cancel', cancel)],
     )
+    add_fav_handler = MessageHandler(Filters.text('❤'), add_to_fav)
     dispatcher.add_handler(start_handler)
+    dispatcher.add_handler(add_fav_handler)
     dispatcher.add_handler(info_handler)
     dispatcher.add_handler(roll_handler)
+    dispatcher.add_handler(fav_handler)
     dispatcher.add_handler(statistic_handler)
     dispatcher.add_handler(default_handler)
     dispatcher.add_handler(sorting_handler)

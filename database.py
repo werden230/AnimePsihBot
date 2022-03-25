@@ -58,3 +58,10 @@ def update_rolls(user_id):
         cur = con.cursor()
         cur.execute(f"UPDATE users SET total_rolls = total_rolls+1 WHERE user_id == {user_id}")
     con.close()
+
+
+def update_favourites(anime_id, user_id):
+    with sq.connect('users_data.db') as con:
+        cur = con.cursor()
+        cur.execute(f"UPDATE users SET favs = '{get_parametr('favs', user_id) + anime_id}' WHERE user_id == {user_id}")
+    con.close()

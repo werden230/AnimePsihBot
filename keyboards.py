@@ -1,9 +1,41 @@
 from telegram import ReplyKeyboardMarkup
+from telegram import InlineKeyboardMarkup
+from telegram import InlineKeyboardButton
 
 DEFAULT_KB = ReplyKeyboardMarkup(
         [
-            ["/info", "/roll", "/filter"]
+            ["/favs", "/roll", "/filter"],
+            ["❤"]
         ], resize_keyboard=True
+)
+
+PREV = 'callback_prev'
+DEL = 'callback_del'
+NEXT = 'callback_next'
+
+
+TITLES = {PREV: '\u2B05',
+          DEL: '\u27A1',
+          NEXT: '\u27A1'}
+
+
+FIRST_FAV = InlineKeyboardMarkup(
+    [
+        [InlineKeyboardButton(TITLES[NEXT], callback_data=NEXT)]
+    ]
+)
+
+FAV = InlineKeyboardMarkup(
+    [
+        [InlineKeyboardButton(TITLES[PREV], callback_data=PREV),
+         InlineKeyboardButton(TITLES[NEXT], callback_data=NEXT)]
+    ]
+)
+
+LAST_FAV = InlineKeyboardMarkup(
+    [
+        [InlineKeyboardButton(TITLES[PREV], callback_data=PREV)]
+    ]
 )
 
 GRADES_KB = ReplyKeyboardMarkup(
@@ -30,6 +62,7 @@ GENRES_KB = ReplyKeyboardMarkup(
 
 RESET_KB = ReplyKeyboardMarkup(
         [
-            ["/info", "/roll", "/filter", '/reset']
+            ["/favs", "/roll", "/filter", '/reset'],
+            ["❤"]
         ], resize_keyboard=True
 )
