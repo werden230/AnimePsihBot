@@ -74,9 +74,9 @@ def get_random_anime(user_id):
     with open('sorted.json', 'r', encoding='utf-8') as file:
         t = file.read()
         animes = json.loads(t)
-        animes = filter_grade(animes, db.get_parametr('grade', user_id))
-        animes = filter_type(animes, db.get_parametr('type', user_id))
-        animes = filter_genre(animes, db.get_parametr('genre', user_id))
+        animes = filter_grade(animes, db.get_filter('grade', user_id))
+        animes = filter_type(animes, db.get_filter('type', user_id))
+        animes = filter_genre(animes, db.get_filter('genre', user_id))
         anime = choice(animes)
     return anime
 
@@ -116,7 +116,7 @@ def roll(update: Update, context: CallbackContext):
 
 def add_to_fav(update: Update, context: CallbackContext):
     user_id = update.effective_user.id
-    anime_id = str(db.get_parametr('last_anime', user_id)) + ' '
+    anime_id = db.get_parametr('last_anime', user_id)
     if anime_id in db.get_parametr('favs', user_id):
         update.message.reply_text("Аниме уже есть в избранном!")
         return
@@ -126,7 +126,7 @@ def add_to_fav(update: Update, context: CallbackContext):
 
 def get_favs(update: Update, context: CallbackContext):
     user_id = update.effective_user.id
-    anime_id = int(db.get_parametr('favs', user_id)[:-1].split()[0])
+    anime_id = db.get_parametr('favs', user_id)[0]
     anime = get_anime(anime_id)
     message = create_message(anime)
     context.bot.send_photo(
@@ -148,7 +148,7 @@ def pick_grade(update: Update, context: CallbackContext):
     try:
         answer = update.message.text
         grade = 0 if answer == "Неважно" else float(answer)
-        db.set_parametr('grade', grade, update.effective_user.id)
+        db.set_filter('grade', grade, update.effective_user.id)
     except ValueError:
         update.message.reply_text(text="Введи оценку правильно!")
         return 1
@@ -162,7 +162,7 @@ def pick_type(update: Update, context: CallbackContext):
     if type and type not in strings.ANIME_TYPES_SIMPLIFIED:
         update.message.reply_text(text="Такого типа не существует, попробуй ещё раз =)")
         return 2
-    db.set_parametr('type', type, update.effective_user.id)
+    db.set_filter('type', type, update.effective_user.id)
     update.message.reply_text(text="Выбери желаемый жанр аниме.", reply_markup=kb.GENRES_KB)
     return 3
 
@@ -173,7 +173,7 @@ def pick_genre(update: Update, context: CallbackContext):
     if genre and genre not in strings.ANIME_GENRES:
         update.message.reply_text(text="Такого жанра не существует, попробуй ещё раз =)")
         return 3
-    db.set_parametr('genre', genre, update.effective_user.id)
+    db.set_filter('genre', genre, update.effective_user.id)
     update.message.reply_text(text="Фильтр успешно настроен!", reply_markup=kb.RESET_KB)
     return ConversationHandler.END
 
