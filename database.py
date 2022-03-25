@@ -30,51 +30,19 @@ def get_all_users():
     return result
 
 
-def get_grade(user_id):
+def get_parametr(parametr, user_id):
     with sq.connect('users_data.db') as con:
         cur = con.cursor()
-        cur.execute(f"SELECT grade FROM users WHERE user_id == {user_id}")
+        cur.execute(f"SELECT {parametr} FROM users WHERE user_id == {user_id}")
         result = cur.fetchone()[0]
     con.close()
     return result
 
 
-def get_type(user_id):
+def set_parametr(parametr_name, parametr, user_id):
     with sq.connect('users_data.db') as con:
         cur = con.cursor()
-        cur.execute(f"SELECT type FROM users WHERE user_id == {user_id}")
-        result = cur.fetchone()[0]
-    con.close()
-    return result
-
-
-def get_genre(user_id):
-    with sq.connect('users_data.db') as con:
-        cur = con.cursor()
-        cur.execute(f"SELECT genre FROM users WHERE user_id == {user_id}")
-        result = cur.fetchone()[0]
-    con.close()
-    return result
-
-
-def set_anime_grade(user_id, grade):
-    with sq.connect('users_data.db') as con:
-        cur = con.cursor()
-        cur.execute(f"UPDATE users SET grade = {grade} WHERE user_id == {user_id}")
-    con.close()
-
-
-def set_anime_type(user_id, type):
-    with sq.connect('users_data.db') as con:
-        cur = con.cursor()
-        cur.execute(f"UPDATE users SET type = '{type}' WHERE user_id == {user_id}")
-    con.close()
-
-
-def set_anime_genre(user_id, genre):
-    with sq.connect('users_data.db') as con:
-        cur = con.cursor()
-        cur.execute(f"UPDATE users SET genre = '{genre}' WHERE user_id == {user_id}")
+        cur.execute(f"UPDATE users SET {parametr_name} = '{parametr}' WHERE user_id == {user_id}")
     con.close()
 
 
@@ -90,12 +58,3 @@ def update_rolls(user_id):
         cur = con.cursor()
         cur.execute(f"UPDATE users SET total_rolls = total_rolls+1 WHERE user_id == {user_id}")
     con.close()
-
-
-def get_rolls(user_id):
-    with sq.connect('users_data.db') as con:
-        cur = con.cursor()
-        cur.execute(f"SELECT total_rolls FROM users WHERE user_id == {user_id}")
-        result = cur.fetchone()[0]
-    con.close()
-    return result

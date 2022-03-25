@@ -74,9 +74,9 @@ def get_anime(user_id):
     with open('sorted.json', 'r', encoding='utf-8') as file:
         t = file.read()
         animes = json.loads(t)
-        animes = filter_grade(animes, db.get_grade(user_id))
-        animes = filter_type(animes, db.get_type(user_id))
-        animes = filter_genre(animes, db.get_genre(user_id))
+        animes = filter_grade(animes, db.get_parametr('grade', user_id))
+        animes = filter_type(animes, db.get_parametr('type', user_id))
+        animes = filter_genre(animes, db.get_parametr('genre', user_id))
         anime = choice(animes)
     return anime
 
@@ -115,7 +115,7 @@ def pick_grade(update: Update, context: CallbackContext):
     try:
         answer = update.message.text
         grade = 0 if answer == "Неважно" else float(answer)
-        db.set_anime_grade(update.effective_user.id, grade)
+        db.set_parametr('grade', grade, update.effective_user.id)
     except ValueError:
         update.message.reply_text(text="Введи оценку правильно!")
         return 1
@@ -129,7 +129,7 @@ def pick_type(update: Update, context: CallbackContext):
     if type and type not in strings.ANIME_TYPES_SIMPLIFIED:
         update.message.reply_text(text="Такого типа не существует, попробуй ещё раз =)")
         return 2
-    db.set_anime_type(update.effective_user.id, type)
+    db.set_parametr('type', type, update.effective_user.id)
     update.message.reply_text(text="Выбери желаемый жанр аниме.", reply_markup=kb.GENRES_KB)
     return 3
 
@@ -140,7 +140,7 @@ def pick_genre(update: Update, context: CallbackContext):
     if genre and genre not in strings.ANIME_GENRES:
         update.message.reply_text(text="Такого жанра не существует, попробуй ещё раз =)")
         return 3
-    db.set_anime_genre(update.effective_user.id, genre)
+    db.set_parametr('genre', genre, update.effective_user.id)
     update.message.reply_text(text="Фильтр успешно настроен!", reply_markup=kb.RESET_KB)
     return ConversationHandler.END
 
@@ -160,7 +160,7 @@ def cancel(update: Update, context: CallbackContext):
 
 def statistic(update: Update, context: CallbackContext):
     user_id = update.effective_user.id
-    update.message.reply_text(text=f"Общее количество роллов: {db.get_rolls(user_id)}")
+    update.message.reply_text(text=f"Общее количество роллов: {db.get_parametr('total_rolls', user_id)}")
 
 
 def main():
