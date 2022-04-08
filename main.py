@@ -13,6 +13,8 @@ from telegram.ext import CallbackContext
 from telegram.ext import ConversationHandler
 from telegram.ext import CommandHandler
 from telegram.ext import MessageHandler
+from telegram.ext import CallbackQueryHandler
+from telegram.files.inputmedia import InputMediaPhoto
 from config import TG_TOKEN
 
 
@@ -105,7 +107,7 @@ def roll(update: Update, context: CallbackContext):
             parse_mode='MARKDOWN',
             reply_markup=reply_markup
         )
-        db.set_parametr('last_anime', anime['id'], update.effective_user.id)
+        db.set_parameter('last_anime', anime['id'], update.effective_user.id)
     except IndexError:
         update.message.reply_text(text="Такого аниме не нашлось...")
     except:
@@ -116,26 +118,92 @@ def roll(update: Update, context: CallbackContext):
 
 def add_to_fav(update: Update, context: CallbackContext):
     user_id = update.effective_user.id
-    anime_id = db.get_parametr('last_anime', user_id)
-    if anime_id in db.get_parametr('favs', user_id):
+    anime_id = db.get_parameter('last_anime', user_id)
+    if anime_id in db.get_parameter('favs', user_id):
         update.message.reply_text("Аниме уже есть в избранном!")
         return
-    db.update_favourites(anime_id, user_id)
+    db.add_favourite(anime_id, user_id)
     update.message.reply_text("Аниме добавлено в избранное!")
 
 
 def get_favs(update: Update, context: CallbackContext):
     user_id = update.effective_user.id
-    anime_id = db.get_parametr('favs', user_id)[0]
+    chat_id = update.effective_chat.id
+    favs = db.get_parameter('favs', user_id)
+    if len(favs) == 0:
+        context.bot.send_message(chat_id=chat_id, text='Список избранного пуст!')
+        return
+    db.set_parameter('cur_fav_pos', 0, user_id)
+    anime_id = favs[0]
     anime = get_anime(anime_id)
     message = create_message(anime)
     context.bot.send_photo(
-        chat_id=update.effective_chat.id,
+        chat_id=chat_id,
         photo=anime["image"],
-        caption=message,
+        caption=message+f"\n\n1/{len(favs)}",
         parse_mode='MARKDOWN',
-        reply_markup=kb.FIRST_FAV
+        reply_markup=kb.get_first_keyboard() if len(favs) > 1 else kb.get_single_keyboard()
     )
+
+
+def check_status(index: int, favs: list):
+    if len(favs) == 1:
+        status = 'single'
+    elif index == 0:
+        status = 'first'
+    elif index == len(favs)-1:
+        status = 'last'
+    else:
+        status = 'middle'
+    return status
+
+
+def favs_keyboard_handler(update: Update, context: CallbackContext):
+    query = update.callback_query
+    data = query.data
+    user_id = update.effective_user.id
+    chat_id = update.effective_chat.id
+    if data in (kb.NEXT, kb.PREV):
+        favs = db.get_parameter('favs', user_id)
+        db.inc_position(user_id) if data == kb.NEXT else db.dec_position(user_id)
+        index = db.get_parameter('cur_fav_pos', user_id)
+        anime_id = favs[index]
+        anime = get_anime(anime_id)
+        message = create_message(anime)
+        status = check_status(index, favs)
+        query.message.edit_media(
+            InputMediaPhoto(
+                media=anime["image"],
+                caption=message+f"\n\n{index+1}/{len(favs)}",
+                parse_mode='MARKDOWN'
+            ),
+            reply_markup=kb.INLINE_KBS[status]
+        )
+    elif data == kb.DEL:
+        index = db.get_parameter('cur_fav_pos', user_id)
+        db.delete_favourite(index, user_id)
+        favs = db.get_parameter('favs', user_id)
+        if favs:
+            if index < len(favs):
+                anime_id = favs[index]
+            else:
+                anime_id = favs[index - 1]
+                db.dec_position(user_id)
+                index -= 1
+            anime = get_anime(anime_id)
+            status = check_status(index, favs)
+            message = create_message(anime)
+            query.message.edit_media(
+                InputMediaPhoto(
+                    media=anime["image"],
+                    caption=message+f"\n\n{index+1}/{len(favs)}",
+                    parse_mode='MARKDOWN'
+                ),
+                reply_markup=kb.INLINE_KBS[status]
+            )
+        else:
+            query.delete_message()
+            context.bot.send_message(chat_id=chat_id, text='Список избранного пуст!')
 
 
 # /filter command
@@ -193,7 +261,8 @@ def cancel(update: Update, context: CallbackContext):
 
 def statistic(update: Update, context: CallbackContext):
     user_id = update.effective_user.id
-    update.message.reply_text(text=f"Общее количество роллов: {db.get_parametr('total_rolls', user_id)}")
+    update.message.reply_text(text=f"Общее количество роллов: {db.get_parameter('total_rolls', user_id)}\n"
+                                   f"Количество аниме в избранном: {len(db.get_parameter('favs', user_id))}")
 
 
 def main():
@@ -204,7 +273,9 @@ def main():
     start_handler = CommandHandler('start', start)
     info_handler = CommandHandler('info', info)
     roll_handler = CommandHandler('roll', roll)
-    fav_handler = CommandHandler('favs', get_favs)
+    add_fav_handler = MessageHandler(Filters.text('❤'), add_to_fav)
+    get_favs_handler = CommandHandler('favs', get_favs)
+    favs_buttons_handler = CallbackQueryHandler(callback=favs_keyboard_handler)
     statistic_handler = CommandHandler('stat', statistic)
     default_handler = CommandHandler('reset', reset)
     sorting_handler = ConversationHandler(
@@ -214,17 +285,18 @@ def main():
             2: [MessageHandler(Filters.text & (~Filters.command), pick_type)],
             3: [MessageHandler(Filters.text & (~Filters.command), pick_genre)]
         },
-        fallbacks=[CommandHandler('cancel', cancel)],
-    )
-    add_fav_handler = MessageHandler(Filters.text('❤'), add_to_fav)
+        fallbacks=[CommandHandler('cancel', cancel)])
+
     dispatcher.add_handler(start_handler)
     dispatcher.add_handler(add_fav_handler)
+    dispatcher.add_handler(get_favs_handler)
+    dispatcher.add_handler(favs_buttons_handler)
     dispatcher.add_handler(info_handler)
     dispatcher.add_handler(roll_handler)
-    dispatcher.add_handler(fav_handler)
     dispatcher.add_handler(statistic_handler)
     dispatcher.add_handler(default_handler)
     dispatcher.add_handler(sorting_handler)
+
     logging.basicConfig(
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO
     )

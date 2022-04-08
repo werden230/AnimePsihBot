@@ -1,6 +1,7 @@
 from pymongo import MongoClient
 from config import MONGODB_TOKEN
 
+
 def add_user(user_id, username):
     collection.insert_one({
         '_id': user_id,
@@ -12,7 +13,8 @@ def add_user(user_id, username):
         },
         'total_rolls': 0,
         'last_anime': 351,
-        'favs': []
+        'favs': [],
+        'cur_fav_pos': -1
     })
 
 
@@ -29,10 +31,10 @@ def get_filter(filter_name, user_id):
     return result
 
 
-def get_parametr(parametr_name, user_id):
+def get_parameter(parameter_name, user_id):
     result = collection.find_one({
         '_id': user_id
-    })[f'{parametr_name}']
+    })[f'{parameter_name}']
     return result
 
 
@@ -40,8 +42,8 @@ def set_filter(filter_name, value, user_id):
     collection.update_one({'_id': user_id}, {'$set': {f'filters.{filter_name}': value}})
 
 
-def set_parametr(parametr_name, value, user_id):
-    collection.update_one({'_id': user_id}, {'$set': {f'{parametr_name}': value}})
+def set_parameter(parameter_name, value, user_id):
+    collection.update_one({'_id': user_id}, {'$set': {f'{parameter_name}': value}})
 
 
 def set_default_filters(user_id):
@@ -53,8 +55,21 @@ def update_rolls(user_id):
     collection.update_one({'_id': user_id}, {'$inc': {'total_rolls': 1}})
 
 
-def update_favourites(anime_id, user_id):
+def add_favourite(anime_id, user_id):
     collection.update_one({'_id': user_id}, {'$push': {'favs': anime_id}})
+
+
+def delete_favourite(index, user_id):
+    anime_id = get_parameter('favs', user_id)[index]
+    collection.update_one({'_id': user_id}, {'$pull': {"favs": anime_id}})
+
+
+def inc_position(user_id):
+    collection.update_one({'_id': user_id}, {'$inc': {'cur_fav_pos': 1}})
+
+
+def dec_position(user_id):
+    collection.update_one({'_id': user_id}, {'$inc': {'cur_fav_pos': -1}})
 
 
 cluster = MongoClient(MONGODB_TOKEN)
