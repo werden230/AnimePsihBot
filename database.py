@@ -7,9 +7,9 @@ def add_user(user_id, username):
         '_id': user_id,
         'username': username,
         'filters': {
-            'grade': 0.0,
-            'type': '',
-            'genre': ''
+            'grade': 0,
+            'type': None,
+            'genre': None
         },
         'total_rolls': 0,
         'last_anime': 351,
@@ -47,7 +47,7 @@ def set_parameter(parameter_name, value, user_id):
 
 
 def set_default_filters(user_id):
-    default = {'grade': 0.0, 'type': '', 'genre': ''}
+    default = {'grade': 0, 'type': None, 'genre': None}
     collection.update_one({'_id': user_id}, {'$set': {'filters': default}})
 
 
