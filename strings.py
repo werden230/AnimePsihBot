@@ -1,8 +1,5 @@
 from datetime import datetime
-import locale
 
-
-locale.setlocale(locale.LC_TIME, "ru_RU")
 
 START_MESSAGE = """Привет! Этот бот может скинуть тебе случайное аниме с сайта Шикимори.
 Начать поиск - /roll
@@ -42,6 +39,19 @@ FORMAT = {'tv': "TV Сериал",
           None: '-'
           }
 
+MONTHS = {'Dec': "дек",
+          'Jan': "янв",
+          'Feb': "фев",
+          'Mar': "мар",
+          'Apr': "апр",
+          'May': "мая",
+          'Jun': "июня",
+          'Jul': "июля",
+          'Aug': "авг",
+          'Sep': "сен",
+          'Oct': "окт",
+          'Nov': "ноя"}
+
 
 def get_duration(mins):
     m = mins % 60
@@ -63,7 +73,7 @@ def get_status(a_status, start, stop):
     if a_status == "вышло" and stop:
         status = f'вышло в {start.strftime("%Y")}-{stop.strftime("%Y")} гг.'
     elif a_status == "вышло" and not stop:
-        status = f'вышло {start.strftime("%d %b %Y").strip("0")} г.'
+        status = f'вышло {start.strftime("%d").strip("0")} {MONTHS[start.strftime("%b")]} {start.strftime("%Y")} г.'
     elif a_status == "онгоинг":
         status = f'онгоинг с {start.strftime("%d %b %Y").strip("0")} г.'
     else:
