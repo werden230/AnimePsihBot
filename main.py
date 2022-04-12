@@ -1,9 +1,8 @@
 import logging
-import json
 import strings
 import database as db
 import keyboards as kb
-from random import choice
+import scraping as scr
 from telegram import Update
 from telegram import InlineKeyboardMarkup
 from telegram import InlineKeyboardButton
@@ -27,74 +26,14 @@ def start(update: Update, context: CallbackContext):
     update.message.reply_text(text=strings.START_MESSAGE, reply_markup=kb.DEFAULT_KB)
 
 
-# /info command
-def info(update: Update, context: CallbackContext):
-    update.message.reply_text(text=strings.INFO_MESSAGE)
-
-
-# filter by anime rating
-def filter_grade(animes: list, grade: float):
-    if not grade or grade == "неважно":
-        return animes
-    return list(filter(lambda x: grade <= float(x["Оценка на MAL"]), animes))
-
-
-# filter by anime type
-def filter_type(animes: list, kind: str):
-    if not kind or kind == "неважно":
-        return animes
-    return list(filter(lambda x: kind.lower() == x["Тип"].lower(), animes))
-
-
-# filter by anime genre
-def filter_genre(animes: list, genre: str):
-    if not genre or genre == "неважно":
-        return animes
-    return list(filter(lambda x: genre.lower() in x["Жанры"].lower(), animes))
-
-
-def create_message(anime: dict):
-    length = sum([len(x + y) for x, y in list(anime.items())[:-1]]) - len(anime['link']) - len(anime['image'])
-    if length > 1024:
-        desc = anime['Описание']
-        desc = desc[:1024 - length - len("читать дальше...")]
-        desc = '.'.join(desc.split('.')[:-1]) + f'. [Читать дальше...]({anime["link"]})'
-        anime['Описание'] = desc
-    message = f'*{anime["Название"]}*' \
-              f'\nТип: {anime["Тип"]}' \
-              f'\nОценка: {anime["Оценка на MAL"]}' \
-              f'\nЭпизоды: {anime["Эпизоды"]}' \
-              f'\nДлительность эпизода: {anime["Длительность эпизода"]}' \
-              f'\nСтатус: {anime["Статус"]}' \
-              f'\nРейтинг: {anime["Рейтинг"]}' \
-              f'\nОписание: {anime["Описание"]}' \
-              f'\nЖанры: {anime["Жанры"]}'
-    return message
-
-
-def get_random_anime(user_id):
-    with open('sorted.json', 'r', encoding='utf-8') as file:
-        t = file.read()
-        animes = json.loads(t)
-        animes = filter_grade(animes, db.get_filter('grade', user_id))
-        animes = filter_type(animes, db.get_filter('type', user_id))
-        animes = filter_genre(animes, db.get_filter('genre', user_id))
-        anime = choice(animes)
-    return anime
-
-
-def get_anime(anime_id):
-    with open('sorted.json', 'r', encoding='utf-8') as file:
-        t = file.read()
-        animes = json.loads(t)
-        anime = animes[anime_id]
-    return anime
-
-
 def roll(update: Update, context: CallbackContext):
     try:
-        anime = get_random_anime(update.effective_user.id)
-        message = create_message(anime)
+        user_id = update.effective_user.id
+        score = db.get_filter('grade', user_id)
+        kind = db.get_filter('type', user_id)
+        genre = db.get_filter('genre', user_id)
+        anime = scr.get_random_anime(score=score, kind=kind, genre=genre)
+        message = strings.create_message(anime)
         reply_markup = InlineKeyboardMarkup(
             [
                 [InlineKeyboardButton(text="Подробнее на Шики", url=anime["link"])]
@@ -102,7 +41,7 @@ def roll(update: Update, context: CallbackContext):
         )
         context.bot.send_photo(
             chat_id=update.effective_chat.id,
-            photo=anime["image"],
+            photo=anime["img"],
             caption=message,
             parse_mode='MARKDOWN',
             reply_markup=reply_markup
@@ -135,11 +74,11 @@ def get_favs(update: Update, context: CallbackContext):
         return
     db.set_parameter('cur_fav_pos', 0, user_id)
     anime_id = favs[0]
-    anime = get_anime(anime_id)
-    message = create_message(anime)
+    anime = scr.get_anime(anime_id)
+    message = strings.create_message(anime)
     context.bot.send_photo(
         chat_id=chat_id,
-        photo=anime["image"],
+        photo=anime["img"],
         caption=message+f"\n\n1/{len(favs)}",
         parse_mode='MARKDOWN',
         reply_markup=kb.get_first_keyboard() if len(favs) > 1 else kb.get_single_keyboard()
@@ -168,12 +107,12 @@ def favs_keyboard_handler(update: Update, context: CallbackContext):
         db.inc_position(user_id) if data == kb.NEXT else db.dec_position(user_id)
         index = db.get_parameter('cur_fav_pos', user_id)
         anime_id = favs[index]
-        anime = get_anime(anime_id)
-        message = create_message(anime)
+        anime = scr.get_anime(anime_id)
+        message = strings.create_message(anime)
         status = check_status(index, favs)
         query.message.edit_media(
             InputMediaPhoto(
-                media=anime["image"],
+                media=anime["img"],
                 caption=message+f"\n\n{index+1}/{len(favs)}",
                 parse_mode='MARKDOWN'
             ),
@@ -190,12 +129,12 @@ def favs_keyboard_handler(update: Update, context: CallbackContext):
                 anime_id = favs[index - 1]
                 db.dec_position(user_id)
                 index -= 1
-            anime = get_anime(anime_id)
+            anime = scr.get_anime(anime_id)
             status = check_status(index, favs)
-            message = create_message(anime)
+            message = strings.create_message(anime)
             query.message.edit_media(
                 InputMediaPhoto(
-                    media=anime["image"],
+                    media=anime["img"],
                     caption=message+f"\n\n{index+1}/{len(favs)}",
                     parse_mode='MARKDOWN'
                 ),
@@ -215,7 +154,7 @@ def start_filter(update: Update, context: CallbackContext):
 def pick_grade(update: Update, context: CallbackContext):
     try:
         answer = update.message.text
-        grade = 0 if answer == "Неважно" else float(answer)
+        grade = 6 if answer == "Неважно" else max(int(answer), 6)
         db.set_filter('grade', grade, update.effective_user.id)
     except ValueError:
         update.message.reply_text(text="Введи оценку правильно!")
@@ -226,22 +165,22 @@ def pick_grade(update: Update, context: CallbackContext):
 
 def pick_type(update: Update, context: CallbackContext):
     answer = update.message.text.lower()
-    type = '' if answer == 'неважно' else answer
-    if type and type not in strings.ANIME_TYPES_SIMPLIFIED:
+    type = None if answer == 'неважно' else answer
+    if type and type not in strings.ANIME_TYPES:
         update.message.reply_text(text="Такого типа не существует, попробуй ещё раз =)")
         return 2
-    db.set_filter('type', type, update.effective_user.id)
+    db.set_filter('type', strings.ANIME_TYPES[type], update.effective_user.id)
     update.message.reply_text(text="Выбери желаемый жанр аниме.", reply_markup=kb.GENRES_KB)
     return 3
 
 
 def pick_genre(update: Update, context: CallbackContext):
     answer = update.message.text.lower()
-    genre = '' if answer == 'неважно' else answer
+    genre = None if answer == 'неважно' else answer
     if genre and genre not in strings.ANIME_GENRES:
         update.message.reply_text(text="Такого жанра не существует, попробуй ещё раз =)")
         return 3
-    db.set_filter('genre', genre, update.effective_user.id)
+    db.set_filter('genre', strings.ANIME_GENRES[genre], update.effective_user.id)
     update.message.reply_text(text="Фильтр успешно настроен!", reply_markup=kb.RESET_KB)
     return ConversationHandler.END
 
@@ -271,7 +210,6 @@ def main():
     )
     dispatcher = updater.dispatcher
     start_handler = CommandHandler('start', start)
-    info_handler = CommandHandler('info', info)
     roll_handler = CommandHandler('roll', roll)
     add_fav_handler = MessageHandler(Filters.text('❤'), add_to_fav)
     get_favs_handler = CommandHandler('favs', get_favs)
@@ -291,7 +229,6 @@ def main():
     dispatcher.add_handler(add_fav_handler)
     dispatcher.add_handler(get_favs_handler)
     dispatcher.add_handler(favs_buttons_handler)
-    dispatcher.add_handler(info_handler)
     dispatcher.add_handler(roll_handler)
     dispatcher.add_handler(statistic_handler)
     dispatcher.add_handler(default_handler)
